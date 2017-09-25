@@ -14,29 +14,28 @@ import "encoding/json"
 import "flag"
 
 type DirEntry struct {
-	pth string
-	fi os.FileInfo
+	pth      string
+	fi       os.FileInfo
 	checksum string
 }
 
-type DirEntries []DirEntry;
+type DirEntries []DirEntry
 
-func (a DirEntries) Len() int { return len(a) }
-func (a DirEntries) Less(i,j int) bool { return a[i].pth < a[j].pth }
-func (a DirEntries) Swap(i,j int) {
+func (a DirEntries) Len() int           { return len(a) }
+func (a DirEntries) Less(i, j int) bool { return a[i].pth < a[j].pth }
+func (a DirEntries) Swap(i, j int) {
 	a[i], a[j] = a[j], a[i]
 }
 
 type AppConfig struct {
-	Name string
-	InputRoot string
-	InputPaths []string
-	OutputDir string
-	BuildCmd string
-	Ignores []string
-
+	Name        string
+	InputRoot   string
+	InputPaths  []string
+	OutputDir   string
+	BuildCmd    string
+	Ignores     []string
+	ArchiveRoot string
 }
-
 
 func countFullChecksum(ents *DirEntries) {
 	for i, v := range *ents {
@@ -63,20 +62,20 @@ func shouldIgnore(pth string, ignores []string) bool {
 	return false
 }
 
-func collectFiles(startPath string, subPaths []string, ignores []string) DirEntries{
+func collectFiles(startPath string, subPaths []string, ignores []string) DirEntries {
 	//skiplist := [...]string{"node_modules", ".git", "Tests"}
 	var all DirEntries
 
-	cb:= func (pth string, files []os.FileInfo) bool {
+	cb := func(pth string, files []os.FileInfo) bool {
 		//fmt.Printf("%s", pth)
 		if shouldIgnore(pth, ignores) {
-			return false;
+			return false
 		}
 
 		for _, value := range files {
 			fullpath := pth + "/" + value.Name()
 			if !shouldIgnore(fullpath, ignores) {
-				all = append(all, DirEntry { fullpath, value, "" });
+				all = append(all, DirEntry{fullpath, value, ""})
 			}
 		}
 		return true
@@ -87,7 +86,7 @@ func collectFiles(startPath string, subPaths []string, ignores []string) DirEntr
 		if fi.IsDir() {
 			walker.WalkOne(fullpth, cb)
 		} else {
-			all = append(all, DirEntry { fullpth, fi, ""})
+			all = append(all, DirEntry{fullpth, fi, ""})
 		}
 	}
 
@@ -101,20 +100,20 @@ func collectFiles(startPath string, subPaths []string, ignores []string) DirEntr
 
 func normalizePaths(ents *DirEntries, rootPath string) {
 	for i, v := range *ents {
-		oldpath := v.pth;
-		newpath := strings.Replace(strings.TrimPrefix(oldpath, rootPath + "/"), "\\", "/", -1)
-		v.pth =newpath;
+		oldpath := v.pth
+		newpath := strings.Replace(strings.TrimPrefix(oldpath, rootPath+"/"), "\\", "/", -1)
+		v.pth = newpath
 		(*ents)[i] = v
 	}
 }
 
-func getCheckSumForFiles(path string, subpaths []string, ignores []string) (DirEntries,string) {
+func getCheckSumForFiles(path string, subpaths []string, ignores []string) (DirEntries, string) {
 	all := collectFiles(path, subpaths, ignores)
-	sort.Sort(all);
+	sort.Sort(all)
 	countFullChecksum(&all)
 	normalizePaths(&all, path)
 	var manifest bytes.Buffer
-	for _, v:= range all {
+	for _, v := range all {
 		manifest.WriteString(v.pth)
 		manifest.WriteString(v.checksum)
 		//fmt.Printf("%s %s\n", v.pth, v.checksum)
@@ -124,9 +123,9 @@ func getCheckSumForFiles(path string, subpaths []string, ignores []string) (DirE
 }
 
 func zipOutput(path string, zipfile string) {
-	cmd:= exec.Command("7za", "a", zipfile, path +"/*")
+	cmd := exec.Command("7za", "a", zipfile, path+"/*")
 	err := cmd.Run()
-	if (err != nil) {
+	if err != nil {
 		panic(err)
 	}
 }
@@ -134,28 +133,35 @@ func zipOutput(path string, zipfile string) {
 func unzipOutput(path string, zipfile string) {
 	// we will replace the old path completely
 	os.RemoveAll(path)
-	out, err := exec.Command("7za", "x", zipfile, "-o" + path).CombinedOutput()
-	if (err != nil) {
+	out, err := exec.Command("7za", "x", zipfile, "-o"+path).CombinedOutput()
+	if err != nil {
 		fmt.Printf("out %s", out)
 		panic(err)
 	}
 }
 
 func runBuildCommand(config *AppConfig) {
-
 	fmt.Printf("Running build command '%s' in %s\n", config.BuildCmd, config.InputRoot)
 	cmd := exec.Command(config.BuildCmd)
 	cmd.Dir = config.InputRoot
 	out, err := cmd.CombinedOutput()
+	fmt.Println(out)
 	if err != nil {
-		fmt.Printf("Build error:\n%s", out)
+		fmt.Printf("Build failed with error!", out)
 		panic(err)
 	}
 }
 
 func buildWithConfig(config *AppConfig) {
 	// check input checksum
-	archiveRoot := "c:/t/zerobuild_cache"
+
+	archiveRoot := config.ArchiveRoot
+
+	if archiveRoot == "" {
+		fmt.Println("HASHIBUILD_ARCHIVE not set, building without artifact caching")
+		runBuildCommand(config)
+		return
+	}
 
 	_, inputChecksum := getCheckSumForFiles(config.InputRoot, config.InputPaths, config.Ignores)
 	// if finding archive found, unzip it and we are ready
@@ -175,18 +181,12 @@ func buildWithConfig(config *AppConfig) {
 
 func parseConfig(configPath string) AppConfig {
 	cont, err := ioutil.ReadFile(configPath)
-	if (err!=nil) {
+	if err != nil {
 		panic(err)
 	}
-	config := AppConfig{"", "", []string{}, "", "", []string{}}
+	config := AppConfig{"", "", []string{}, "", "", []string{}, ""}
 	json.Unmarshal(cont, &config)
 	return config
-}
-
-func runConfigScript(configPath string) {
-	//fmt.Printf("Config %s", config)
-	config := parseConfig(configPath)
-	buildWithConfig(&config)
 }
 
 func dumpManifest(config *AppConfig) {
@@ -197,30 +197,34 @@ func dumpManifest(config *AppConfig) {
 	fmt.Printf("Total: %s\n", csum)
 }
 
-
-
 func main() {
 	manifest := flag.Bool("manifest", false, "Show manifest (requires --config)")
 	treeHash := flag.String("treehash", "", "Show manifest for specified path (no config needed)")
 	toParse := flag.String("config", "", "Json config file")
 	startBuild := flag.Bool("build", false, "Run build")
-
+	archiveDir := flag.String("archive", "", "Archive root dir (needed if HASHIBUILD_ARCHIVE env var is not set)")
 	flag.Parse()
 
 	var config AppConfig
 	if (*toParse) != "" {
 		config = parseConfig(*toParse)
+		if *archiveDir != "" {
+			config.ArchiveRoot = *archiveDir
+		}
+		if config.ArchiveRoot == "" {
+			config.ArchiveRoot = os.Getenv("HASHIBUILD_ARCHIVE")
+		}
 	}
 	if *manifest {
 		dumpManifest(&config)
 	}
 
 	if *startBuild {
-		runConfigScript(*toParse)
+		buildWithConfig(&config)
 	}
 
 	if len(*treeHash) > 0 {
-		config := AppConfig { InputRoot: *treeHash, InputPaths: []string{}, Ignores: []string { ".git", "node_modules"} }
+		config := AppConfig{InputRoot: *treeHash, InputPaths: []string{}, Ignores: []string{".git", "node_modules"}}
 		dumpManifest(&config)
 	}
 
