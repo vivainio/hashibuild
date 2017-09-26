@@ -1,17 +1,21 @@
 package main
 
-import "github.com/vivainio/walker"
-import "fmt"
-import "os"
-import "sort"
-import "strings"
-import "io/ioutil"
-import "crypto/md5"
-import "encoding/hex"
-import "bytes"
-import "os/exec"
-import "encoding/json"
-import "flag"
+import (
+	"bytes"
+	"crypto/md5"
+	"encoding/hex"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/vivainio/walker"
+)
 
 type DirEntry struct {
 	pth      string
@@ -82,7 +86,10 @@ func collectFiles(startPath string, subPaths []string, ignores []string) DirEntr
 	}
 	for _, subpath := range subPaths {
 		fullpth := startPath + "/" + subpath
-		fi, _ := os.Stat(fullpth)
+		fi, err := os.Stat(fullpth)
+		if err != nil {
+			fmt.Printf("Cannot open file %s", fullpth)
+		}
 		if fi.IsDir() {
 			walker.WalkOne(fullpth, cb)
 		} else {
@@ -147,7 +154,7 @@ func runBuildCommand(config *AppConfig) {
 	out, err := cmd.CombinedOutput()
 	fmt.Println(out)
 	if err != nil {
-		fmt.Printf("Build failed with error!", out)
+		fmt.Printf("Build failed with error!")
 		panic(err)
 	}
 }
@@ -179,6 +186,12 @@ func buildWithConfig(config *AppConfig) {
 	zipOutput(config.OutputDir, zipName)
 }
 
+func ensureDir(pth string) {
+	if _, err := os.Stat(pth); os.IsNotExist(err) {
+		fmt.Printf("Path does not exist: %s", pth)
+		panic(err)
+	}
+}
 func parseConfig(configPath string) AppConfig {
 	cont, err := ioutil.ReadFile(configPath)
 	if err != nil {
@@ -186,6 +199,14 @@ func parseConfig(configPath string) AppConfig {
 	}
 	config := AppConfig{"", "", []string{}, "", "", []string{}, ""}
 	json.Unmarshal(cont, &config)
+
+	// fixup paths to be relative to config file
+	configDir, _ := filepath.Abs(filepath.Dir(configPath))
+	config.InputRoot = filepath.Join(configDir, config.InputRoot)
+	config.OutputDir = filepath.Join(configDir, config.OutputDir)
+	ensureDir(config.InputRoot)
+	ensureDir(config.OutputDir)
+
 	return config
 }
 
