@@ -224,6 +224,12 @@ func main() {
 	toParse := flag.String("config", "", "Json config file")
 	startBuild := flag.Bool("build", false, "Run build")
 	archiveDir := flag.String("archive", "", "Archive root dir (needed if HASHIBUILD_ARCHIVE env var is not set)")
+
+	if len(os.Args) < 2 {
+		flag.Usage()
+		return
+	}
+
 	flag.Parse()
 
 	var config AppConfig
