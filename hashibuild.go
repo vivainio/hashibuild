@@ -253,6 +253,8 @@ func parseConfig(configPath string) AppConfig {
 	configDir, _ := filepath.Abs(filepath.Dir(configPath))
 	config.InputRoot = filepath.Join(configDir, config.InputRoot)
 	config.OutputDir = filepath.Join(configDir, config.OutputDir)
+	config.GitRoot = filepath.Join(configDir, config.GitRoot)
+	
 	checkDir(config.InputRoot)
 
 	return config

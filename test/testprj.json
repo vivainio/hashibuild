@@ -1,6 +1,7 @@
 {
     "name": "hashibuildtest",
     "inputRoot": "./src/",
+    "gitRoot": "./src/",
     "inputPaths": ["subdir", "buildsomething.cmd"],
     "outputDir": ".\\out",
     "buildCmd": ".\\buildsomething.cmd",
