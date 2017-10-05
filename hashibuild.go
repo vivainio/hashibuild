@@ -151,7 +151,6 @@ func collectByConfig(config *AppConfig) DirEntries {
 	return collectFiles(config.InputRoot, config.InputPaths, config.Ignores)
 }
 
-//func getCheckSumForFiles(path string, subpaths []string, ignores []string) (DirEntries, string) {
 func getCheckSumForFiles(config *AppConfig) (DirEntries, string) {		
 	all := collectByConfig(config)
 	sort.Sort(all)
