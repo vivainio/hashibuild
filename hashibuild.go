@@ -139,7 +139,7 @@ func unzipOutput(path string, zipfile string) {
 	os.RemoveAll(path)
 	out, err := exec.Command("7za", "x", zipfile, "-o"+path).CombinedOutput()
 	if err != nil {
-		fmt.Printf("out %s", out)
+		fmt.Printf("%s", string(out))
 		panic(err)
 	}
 }
@@ -149,7 +149,7 @@ func runBuildCommand(config *AppConfig) {
 	cmd := exec.Command(config.BuildCmd)
 	cmd.Dir = config.InputRoot
 	out, err := cmd.CombinedOutput()
-	fmt.Println(out)
+	fmt.Println(string(out))
 	if err != nil {
 		fmt.Printf("Build failed with error!")
 		panic(err)

@@ -4,5 +4,5 @@
     "inputPaths": ["subdir", "buildsomething.cmd"],
     "outputDir": ".\\out",
     "buildCmd": ".\\buildsomething.cmd",
-    "ignores": [".git/"]
+    "ignores": ["subdir/ignored.txt"]
 }
