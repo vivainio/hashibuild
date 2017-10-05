@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path"
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
@@ -38,13 +39,27 @@ type AppConfig struct {
 	BuildCmd    string
 	Ignores     []string
 	ArchiveRoot string
+	GitRoot	string
 }
 
 func countFullChecksum(ents *DirEntries) {
 	for i, v := range *ents {
+		st, err := os.Stat(v.pth)
+		if err != nil {
+			fmt.Printf("SKIP bad file [%s]\n", v.pth)
+			continue
+		}
+		v.fi = st
+
 		if v.fi.IsDir() {
 			continue
 		}
+
+		if v.fi.Size() == 0 {
+			v.checksum = "0000"
+			continue
+		}
+
 		dat, err := ioutil.ReadFile(v.pth)
 		if err != nil {
 			panic(err)
@@ -63,6 +78,24 @@ func shouldIgnore(pth string, ignores []string) bool {
 		}
 	}
 	return false
+}
+
+func collectWithGit(startPath string) DirEntries{
+	cmd := exec.Command("git", "ls-files")
+	
+	cmd.Dir = startPath
+	out, err := cmd.Output()
+	if (err != nil) {
+		panic(err)
+	}
+	asStr := string(out)
+	lines := strings.Split(asStr, "\n")
+	var all DirEntries
+	
+	for _, v := range lines {
+		all = append(all, DirEntry { pth: path.Join(startPath ,v)})
+	}
+	return all
 }
 
 func collectFiles(startPath string, subPaths []string, ignores []string) DirEntries {
@@ -111,11 +144,19 @@ func normalizePaths(ents *DirEntries, rootPath string) {
 	}
 }
 
-func getCheckSumForFiles(path string, subpaths []string, ignores []string) (DirEntries, string) {
-	all := collectFiles(path, subpaths, ignores)
+func collectByConfig(config *AppConfig) DirEntries {
+	if len(config.GitRoot) > 0 {
+		return collectWithGit(config.GitRoot)
+	}
+	return collectFiles(config.InputRoot, config.InputPaths, config.Ignores)
+}
+
+//func getCheckSumForFiles(path string, subpaths []string, ignores []string) (DirEntries, string) {
+func getCheckSumForFiles(config *AppConfig) (DirEntries, string) {		
+	all := collectByConfig(config)
 	sort.Sort(all)
 	countFullChecksum(&all)
-	normalizePaths(&all, path)
+	normalizePaths(&all, config.InputRoot)
 	var manifest bytes.Buffer
 	for _, v := range all {
 		manifest.WriteString(v.pth)
@@ -167,7 +208,7 @@ func buildWithConfig(config *AppConfig) {
 		return
 	}
 
-	_, inputChecksum := getCheckSumForFiles(config.InputRoot, config.InputPaths, config.Ignores)
+	_, inputChecksum := getCheckSumForFiles(config)
 	// if finding archive found, unzip it and we are ready
 	zipName := archiveRoot + "/" + config.Name + "_" + inputChecksum + ".zip"
 	if _, err := os.Stat(zipName); !os.IsNotExist(err) {
@@ -203,7 +244,7 @@ func parseConfig(configPath string) AppConfig {
 	if err != nil {
 		panic(err)
 	}
-	config := AppConfig{"", "", []string{}, "", "", []string{}, ""}
+	config := AppConfig{"", "", []string{}, "", "", []string{}, "", ""}
 	err = json.Unmarshal(cont, &config)
 	if (err != nil) {
 		panic(err)
@@ -219,7 +260,7 @@ func parseConfig(configPath string) AppConfig {
 
 func dumpManifest(config *AppConfig) {
 
-	all, csum := getCheckSumForFiles(config.InputRoot, config.InputPaths, config.Ignores)
+	all, csum := getCheckSumForFiles(config)
 	for _, v := range all {
 		fmt.Printf("%s %s\n", v.pth, v.checksum)
 	}
@@ -259,7 +300,9 @@ func main() {
 	}
 
 	if len(*treeHash) > 0 {
-		config := AppConfig{InputRoot: *treeHash, InputPaths: []string{}, Ignores: []string{".git", "node_modules"}}
+		pth, _ := filepath.Abs(*treeHash)
+		
+		config := AppConfig{GitRoot: pth, InputRoot: *treeHash, InputPaths: []string{}, Ignores: []string{".git", "node_modules"}}
 		dumpManifest(&config)
 	}
 
