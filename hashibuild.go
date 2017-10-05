@@ -180,15 +180,24 @@ func buildWithConfig(config *AppConfig) {
 	runBuildCommand(config)
 	// zip the results
 	fmt.Printf("Zipping %s to %s\n", config.OutputDir, zipName)
+	ensureDir(archiveRoot)
 	zipOutput(config.OutputDir, zipName)
 }
 
-func ensureDir(pth string) {
+func checkDir(pth string) {
 	if _, err := os.Stat(pth); os.IsNotExist(err) {
 		fmt.Printf("Path does not exist: %s", pth)
 		panic(err)
 	}
 }
+
+func ensureDir(pth string) {
+	if _, err := os.Stat(pth); os.IsNotExist(err) {
+		fmt.Printf("Creating dir %s", pth)
+		os.MkdirAll(pth, 0777)
+	}	
+}
+
 func parseConfig(configPath string) AppConfig {
 	cont, err := ioutil.ReadFile(configPath)
 	if err != nil {
@@ -203,8 +212,7 @@ func parseConfig(configPath string) AppConfig {
 	configDir, _ := filepath.Abs(filepath.Dir(configPath))
 	config.InputRoot = filepath.Join(configDir, config.InputRoot)
 	config.OutputDir = filepath.Join(configDir, config.OutputDir)
-	ensureDir(config.InputRoot)
-	ensureDir(config.OutputDir)
+	checkDir(config.InputRoot)
 
 	return config
 }

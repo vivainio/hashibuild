@@ -1,1 +1,2 @@
-copy subdir\testfile.txt out\
+md ..\out
+copy subdir\testfile.txt ..\out
