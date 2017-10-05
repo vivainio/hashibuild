@@ -1,0 +1,1 @@
+copy subdir\testfile.txt out\

@@ -1,0 +1,8 @@
+{
+    "name": "hashibuildtest",
+    "inputRoot": "./src/",
+    "inputPaths": ["subdir", "buildsomething.cmd"],
+    "outputDir": ".\\out",
+    "buildCmd": ".\\buildsomething.cmd",
+    "ignores": [".git/"]
+}

@@ -1,0 +1,1 @@
+go run hashibuild.go --config test/testprj.json --manifest

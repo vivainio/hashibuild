@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-
 	"github.com/vivainio/walker"
 )
 
@@ -67,11 +66,9 @@ func shouldIgnore(pth string, ignores []string) bool {
 }
 
 func collectFiles(startPath string, subPaths []string, ignores []string) DirEntries {
-	//skiplist := [...]string{"node_modules", ".git", "Tests"}
 	var all DirEntries
 
 	cb := func(pth string, files []os.FileInfo) bool {
-		//fmt.Printf("%s", pth)
 		if shouldIgnore(pth, ignores) {
 			return false
 		}
@@ -198,8 +195,10 @@ func parseConfig(configPath string) AppConfig {
 		panic(err)
 	}
 	config := AppConfig{"", "", []string{}, "", "", []string{}, ""}
-	json.Unmarshal(cont, &config)
-
+	err = json.Unmarshal(cont, &config)
+	if (err != nil) {
+		panic(err)
+	}
 	// fixup paths to be relative to config file
 	configDir, _ := filepath.Abs(filepath.Dir(configPath))
 	config.InputRoot = filepath.Join(configDir, config.InputRoot)
@@ -211,6 +210,7 @@ func parseConfig(configPath string) AppConfig {
 }
 
 func dumpManifest(config *AppConfig) {
+
 	all, csum := getCheckSumForFiles(config.InputRoot, config.InputPaths, config.Ignores)
 	for _, v := range all {
 		fmt.Printf("%s %s\n", v.pth, v.checksum)
