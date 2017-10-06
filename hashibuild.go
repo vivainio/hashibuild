@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"github.com/vivainio/walker"
 )
 
 type DirEntry struct {
@@ -34,12 +33,11 @@ func (a DirEntries) Swap(i, j int) {
 type AppConfig struct {
 	Name        string
 	InputRoot   string
-	InputPaths  []string
 	OutputDir   string
 	BuildCmd    string
-	Ignores     []string
 	ArchiveRoot string
-	GitRoot	string
+	Include		[]string
+	Exclude		[]string
 }
 
 func countFullChecksum(ents *DirEntries) {
@@ -71,19 +69,30 @@ func countFullChecksum(ents *DirEntries) {
 	}
 }
 
-func shouldIgnore(pth string, ignores []string) bool {
-	for _, ign := range ignores {
-		if strings.HasSuffix(pth, ign) {
+func shouldIgnore(config *AppConfig, pth string) bool {
+	for _,v := range config.Exclude {
+		if strings.HasPrefix(pth, v) {
 			return true
 		}
 	}
-	return false
+
+	if len(config.Include) == 0 {
+		return false
+	}
+
+	for _, v := range config.Include {
+		if strings.HasPrefix(pth, v) {
+			return false
+		}
+	}
+	return true
 }
 
-func collectWithGit(startPath string) DirEntries{
+
+func collectWithGit(config *AppConfig) DirEntries{
 	cmd := exec.Command("git", "ls-files")
 	
-	cmd.Dir = startPath
+	cmd.Dir = config.InputRoot
 	out, err := cmd.Output()
 	if (err != nil) {
 		panic(err)
@@ -93,45 +102,11 @@ func collectWithGit(startPath string) DirEntries{
 	var all DirEntries
 	
 	for _, v := range lines {
-		all = append(all, DirEntry { pth: path.Join(startPath ,v)})
-	}
-	return all
-}
-
-func collectFiles(startPath string, subPaths []string, ignores []string) DirEntries {
-	var all DirEntries
-
-	cb := func(pth string, files []os.FileInfo) bool {
-		if shouldIgnore(pth, ignores) {
-			return false
+		if shouldIgnore(config, v) {
+			continue
 		}
-
-		for _, value := range files {
-			fullpath := pth + "/" + value.Name()
-			if !shouldIgnore(fullpath, ignores) {
-				all = append(all, DirEntry{fullpath, value, ""})
-			}
-		}
-		return true
+		all = append(all, DirEntry { pth: path.Join(config.InputRoot ,v)})
 	}
-	for _, subpath := range subPaths {
-		fullpth := startPath + "/" + subpath
-		fi, err := os.Stat(fullpth)
-		if err != nil {
-			fmt.Printf("Cannot open file %s", fullpth)
-		}
-		if fi.IsDir() {
-			walker.WalkOne(fullpth, cb)
-		} else {
-			all = append(all, DirEntry{fullpth, fi, ""})
-		}
-	}
-
-	// special usage with --treehash: with empty subpaths, just crawl the rootpath (for --treehash)
-	if len(subPaths) == 0 {
-		walker.WalkOne(startPath, cb)
-	}
-
 	return all
 }
 
@@ -145,10 +120,7 @@ func normalizePaths(ents *DirEntries, rootPath string) {
 }
 
 func collectByConfig(config *AppConfig) DirEntries {
-	if len(config.GitRoot) > 0 {
-		return collectWithGit(config.GitRoot)
-	}
-	return collectFiles(config.InputRoot, config.InputPaths, config.Ignores)
+	return collectWithGit(config)
 }
 
 func getCheckSumForFiles(config *AppConfig) (DirEntries, string) {		
@@ -243,7 +215,7 @@ func parseConfig(configPath string) AppConfig {
 	if err != nil {
 		panic(err)
 	}
-	config := AppConfig{"", "", []string{}, "", "", []string{}, "", ""}
+	config := AppConfig{}
 	err = json.Unmarshal(cont, &config)
 	if (err != nil) {
 		panic(err)
@@ -252,7 +224,6 @@ func parseConfig(configPath string) AppConfig {
 	configDir, _ := filepath.Abs(filepath.Dir(configPath))
 	config.InputRoot = filepath.Join(configDir, config.InputRoot)
 	config.OutputDir = filepath.Join(configDir, config.OutputDir)
-	config.GitRoot = filepath.Join(configDir, config.GitRoot)
 	
 	checkDir(config.InputRoot)
 
@@ -303,7 +274,7 @@ func main() {
 	if len(*treeHash) > 0 {
 		pth, _ := filepath.Abs(*treeHash)
 		
-		config := AppConfig{GitRoot: pth, InputRoot: *treeHash, InputPaths: []string{}, Ignores: []string{".git", "node_modules"}}
+		config := AppConfig{InputRoot: pth }
 		dumpManifest(&config)
 	}
 
