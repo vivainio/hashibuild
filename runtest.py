@@ -2,7 +2,7 @@ import os,shutil
 
 def run(arg):
     cmd = 'go run hashibuild.go ' + arg
-    print ">",cmd
+    print ">", cmd
     out = os.popen(cmd).read()
     print out
     return out
@@ -13,6 +13,8 @@ manifest = run(cfg + "--manifest")
 
 for part in ["buildsomething.cmd", "subdir/testfile.txt"]:
     assert part in manifest 
+
+assert "ignored.txt" not in manifest
 
 def nuke(pth):
     if os.path.isdir(pth):
