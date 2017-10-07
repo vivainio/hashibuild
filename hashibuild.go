@@ -155,10 +155,11 @@ func zipOutput(path string, zipfile string) {
 	run("zip", "-r", zipfile, path+"/*")
 }
 
-func unzipOutput(path string, zipfile string) {
-	// we will replace the old path completely
-	os.RemoveAll(path)
-	run("unzip", zipfile, "-d"+path)
+func unzipOutput(pth string, zipfile string) {
+	// we will replace the old path completely	
+	ensureDir(path.Dir(pth))
+	os.RemoveAll(pth)
+	run("unzip", zipfile, "-d"+pth)
 }
 
 func runBuildCommand(config *AppConfig) {
