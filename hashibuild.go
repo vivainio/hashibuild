@@ -141,22 +141,24 @@ func getCheckSumForFiles(config *AppConfig) (DirEntries, string) {
 	return all, hex.EncodeToString(manifestSum[:])
 }
 
-func zipOutput(path string, zipfile string) {
-	cmd := exec.Command("7za", "a", zipfile, path+"/*")
-	err := cmd.Run()
+func run(bin string, arg ...string) {
+	fmt.Printf("> %s %s", bin, arg)	
+		
+	cmd := exec.Command(bin, arg...)
+	out, err := cmd.CombinedOutput()	
+	fmt.Printf("%s", string(out))
 	if err != nil {
 		panic(err)
 	}
+}
+func zipOutput(path string, zipfile string) {
+	run("zip", "-r", zipfile, path+"/*")
 }
 
 func unzipOutput(path string, zipfile string) {
 	// we will replace the old path completely
 	os.RemoveAll(path)
-	out, err := exec.Command("7za", "x", zipfile, "-o"+path).CombinedOutput()
-	if err != nil {
-		fmt.Printf("%s", string(out))
-		panic(err)
-	}
+	run("unzip", zipfile, "-d"+path)
 }
 
 func runBuildCommand(config *AppConfig) {
