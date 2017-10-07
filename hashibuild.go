@@ -1,6 +1,7 @@
 package main
 
 import (
+	"time"
 	"io"
 	"net/http"
 	"path"
@@ -75,8 +76,10 @@ func countFullChecksum(ents *DirEntries) {
 }
 
 func shouldIgnore(config *AppConfig, pth string) bool {
+	pth = strings.ToLower(pth)
+
 	for _,v := range config.Exclude {
-		if strings.HasPrefix(pth, v) {
+		if strings.HasPrefix(pth, strings.ToLower(v)) {
 			return true
 		}
 	}
@@ -86,7 +89,7 @@ func shouldIgnore(config *AppConfig, pth string) bool {
 	}
 
 	for _, v := range config.Include {
-		if strings.HasPrefix(pth, v) {
+		if strings.HasPrefix(pth, strings.ToLower(v)) {
 			return false
 		}
 	}
@@ -313,6 +316,38 @@ func dumpManifest(config *AppConfig) {
 	fmt.Printf("Total: %s\n", csum)
 }
 
+
+// 500mb
+const archiveMaxSize = 500 * 1024 * 1024
+
+func vacuumDirectory(pth string) {
+	if _, err := os.Stat(pth); os.IsNotExist(err) {
+		fmt.Printf("vacuum: path %s does not exist, doing nothing", pth)
+		return
+	}
+
+	dir, _ := os.Open(pth)
+	files, err := dir.Readdir(-1)
+	if err != nil {
+		panic(err)
+	}
+	// sort by size so bigger ones get deleted earlier
+	sort.Slice(files, func(i int,j int) bool {
+		return files[i].Size() > files[j].Size()
+	});
+	tooOld := time.Now().AddDate(0,0,-3)
+	var cumSize int64 = 0
+
+	for _, fi := range files {
+		cumSize = cumSize + fi.Size()
+		
+		if tooOld.After(fi.ModTime()) || cumSize > archiveMaxSize {
+			os.Remove(filepath.Join(pth, fi.Name()))
+		}
+	}
+}
+
+
 func main() {
 	manifest := flag.Bool("manifest", false, "Show manifest (requires --config)")
 	treeHash := flag.String("treehash", "", "Show manifest for specified path (no config needed)")
@@ -321,6 +356,7 @@ func main() {
 	archiveDir := flag.String("archive", "", "Archive root dir (needed if HASHIBUILD_ARCHIVE env var is not set)")
 	fetch := flag.String("fetch", "", "Fetch remote archive file to local archive")
 	salt := flag.String("salt", "", "Provide salt string to invalidate hashes that would otherwise be same")
+	vacuum := flag.Bool("vacuum", false, "Clean up archive directory from old/big files")
 	if len(os.Args) < 2 {
 		flag.Usage()
 		return
@@ -328,20 +364,21 @@ func main() {
 
 	flag.Parse()
 
-	var config AppConfig
+	config := AppConfig{}
 	if (*toParse) != "" {
 		config = parseConfig(*toParse)
-		if *archiveDir != "" {
-			config.ArchiveLocal = *archiveDir
-		}
-		if config.ArchiveLocal == "" {
-			config.ArchiveLocal = os.Getenv("HASHIBUILD_ARCHIVE")
-		}
-		if config.ArchiveRemote == "" {
-			config.ArchiveRemote = os.Getenv("HASHIBUILD_ARCHIVE_REMOTE")
-		}
-		config.Salt = *salt
+	} 
+
+	if *archiveDir != "" {
+		config.ArchiveLocal = *archiveDir
 	}
+	if config.ArchiveLocal == "" {
+		config.ArchiveLocal = os.Getenv("HASHIBUILD_ARCHIVE")
+	}
+	if config.ArchiveRemote == "" {
+		config.ArchiveRemote = os.Getenv("HASHIBUILD_ARCHIVE_REMOTE")
+	}
+	config.Salt = *salt
 
 	if *fetch != "" {
 		_, inputChecksum := getCheckSumForFiles(&config)
@@ -358,6 +395,9 @@ func main() {
 		buildWithConfig(&config)
 	}
 
+	if *vacuum {
+		vacuumDirectory(config.ArchiveLocal)
+	}
 	if len(*treeHash) > 0 {
 		pth, _ := filepath.Abs(*treeHash)
 		

@@ -42,9 +42,11 @@ arccont = os.listdir(archivedir)
 assert len(arccont) == 1 and "hashibuildtest" in arccont[0]
 zipcont = os.popen("7za l %s/%s" % (archivedir, arccont[0])).read()
 assert "testfile.txt" in zipcont
+run("--vacuum")
 nuke(archivedir)
 
 # test remote fetching
 
 os.environ["HASHIBUILD_ARCHIVE_REMOTE"] = "https://github.com/vivainio/hashibuild/raw/master/test/fakeremote/[ZIP]"
 run(buildcmd)
+
