@@ -142,7 +142,7 @@ func getCheckSumForFiles(config *AppConfig) (DirEntries, string) {
 	if config.Salt != "" {
 		manifest.WriteString(config.Salt)
 	}
-	
+
 	manifestSum := md5.Sum(manifest.Bytes())
 	return all, hex.EncodeToString(manifestSum[:])
 }
@@ -152,7 +152,7 @@ func run(cwd string, bin string, arg ...string) {
 	cmd := exec.Command(bin, arg...)
 	cmd.Dir = cwd
 	out, err := cmd.CombinedOutput()	
-	fmt.Printf("%s", string(out))
+	fmt.Printf("%s\n", string(out))
 	if err != nil {
 		panic(err)
 	}
@@ -160,7 +160,7 @@ func run(cwd string, bin string, arg ...string) {
 
 
 func zipOutput(path string, zipfile string) {
-	run(path, "zip", "-r", zipfile, "*")
+	run(path, "zip", "-q", "-r", zipfile, "*")
 }
 
 func unzipOutput(pth string, zipfile string) {
@@ -171,7 +171,7 @@ func unzipOutput(pth string, zipfile string) {
 		panic(err)
 	}
 	ensureDir(pth)
-	run(".", "unzip", zipfile, "-d"+pth)
+	run(".", "unzip", "-qq", zipfile, "-d"+pth)
 }
 
 func runBuildCommand(config *AppConfig) {
