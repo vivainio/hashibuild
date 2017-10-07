@@ -1,6 +1,8 @@
 package main
 
 import (
+	"io"
+	"net/http"
 	"path"
 	"bytes"
 	"crypto/md5"
@@ -35,7 +37,8 @@ type AppConfig struct {
 	InputRoot   string
 	OutputDir   string
 	BuildCmd    string
-	ArchiveRoot string
+	ArchiveLocal string
+	ArchiveRemote string
 	Include		[]string
 	Exclude		[]string
 }
@@ -158,7 +161,8 @@ func unzipOutput(path string, zipfile string) {
 
 func runBuildCommand(config *AppConfig) {
 	fmt.Printf("Running build command '%s' in %s\n", config.BuildCmd, config.InputRoot)
-	cmd := exec.Command(config.BuildCmd)
+	parts := strings.Fields(config.BuildCmd)
+	cmd := exec.Command(parts[0], parts[1:]...)
 	cmd.Dir = config.InputRoot
 	out, err := cmd.CombinedOutput()
 	fmt.Println(string(out))
@@ -168,10 +172,60 @@ func runBuildCommand(config *AppConfig) {
 	}
 }
 
+func fetchTo(url string, to string) bool {
+	fmt.Printf("GET %s\n", url)	
+	resp, err := http.Get(url)
+	if err != nil || resp.StatusCode != 200 {
+		fmt.Printf("Not available: %s\n", url)
+		return false		
+	}
+	defer resp.Body.Close()
+	out, err := os.Create(to)
+	if err != nil {
+		panic(err)
+	}
+	defer out.Close()
+	_, err  = io.Copy(out, resp.Body)
+	if err != nil {
+		panic(err)
+	}
+	return true
+}
+
+func discoverArchive(config *AppConfig, checksum string) (string,bool) {
+	archiveRoot := config.ArchiveLocal	
+	zipName := config.Name + "_" + checksum + ".zip"
+
+	// 1. just try local
+	localZipName := filepath.Join(archiveRoot, zipName)
+	_, err := os.Stat(localZipName)
+	if err == nil {
+		return localZipName, true
+	}
+
+	// 2. try remote if applicable
+
+	remoteArchive := config.ArchiveRemote
+
+	if remoteArchive == "" {
+		return localZipName, false
+	}
+	if strings.Index(remoteArchive, "[ZIP]") == -1 {
+		fmt.Printf("Error: remote archive template %s does not contain [ZIP]\n", remoteArchive)
+		return "", false
+	}
+	remoteUrl := strings.Replace(remoteArchive, "[ZIP]", zipName, -1)
+	fetched := fetchTo(remoteUrl, localZipName)
+	if !fetched {
+		return localZipName, false
+	}
+	return localZipName, true
+}	
+
 func buildWithConfig(config *AppConfig) {
 	// check input checksum
-
-	archiveRoot := config.ArchiveRoot
+	fmt.Printf("Config %s\n", config)
+	archiveRoot := config.ArchiveLocal
 
 	if archiveRoot == "" {
 		fmt.Println("HASHIBUILD_ARCHIVE not set, building without artifact caching")
@@ -181,18 +235,22 @@ func buildWithConfig(config *AppConfig) {
 
 	_, inputChecksum := getCheckSumForFiles(config)
 	// if finding archive found, unzip it and we are ready
-	zipName := archiveRoot + "/" + config.Name + "_" + inputChecksum + ".zip"
-	if _, err := os.Stat(zipName); !os.IsNotExist(err) {
+	ensureDir(archiveRoot)
+	
+	zipName, found := discoverArchive(config, inputChecksum)
+
+	if found {
 		fmt.Printf("Unzip %s to %s\n", zipName, config.OutputDir)
 		unzipOutput(config.OutputDir, zipName)
 		return
 	}
+	
 	// run build if mismatch
 
 	runBuildCommand(config)
+
 	// zip the results
 	fmt.Printf("Zipping %s to %s\n", config.OutputDir, zipName)
-	ensureDir(archiveRoot)
 	zipOutput(config.OutputDir, zipName)
 }
 
@@ -245,7 +303,7 @@ func main() {
 	toParse := flag.String("config", "", "Json config file")
 	startBuild := flag.Bool("build", false, "Run build")
 	archiveDir := flag.String("archive", "", "Archive root dir (needed if HASHIBUILD_ARCHIVE env var is not set)")
-
+	fetch := flag.String("fetch", "", "Fetch remote archive file to local archive")
 	if len(os.Args) < 2 {
 		flag.Usage()
 		return
@@ -257,12 +315,23 @@ func main() {
 	if (*toParse) != "" {
 		config = parseConfig(*toParse)
 		if *archiveDir != "" {
-			config.ArchiveRoot = *archiveDir
+			config.ArchiveLocal = *archiveDir
 		}
-		if config.ArchiveRoot == "" {
-			config.ArchiveRoot = os.Getenv("HASHIBUILD_ARCHIVE")
+		if config.ArchiveLocal == "" {
+			config.ArchiveLocal = os.Getenv("HASHIBUILD_ARCHIVE")
+		}
+		if config.ArchiveRemote == "" {
+			config.ArchiveRemote = os.Getenv("HASHIBUILD_ARCHIVE_REMOTE")
 		}
 	}
+
+	if *fetch != "" {
+		_, inputChecksum := getCheckSumForFiles(&config)
+		// if finding archive found, unzip it and we are ready
+		zipName, _ := discoverArchive(&config, inputChecksum)
+		fmt.Printf("%s", zipName)
+	}
+
 	if *manifest {
 		dumpManifest(&config)
 	}

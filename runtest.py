@@ -1,11 +1,13 @@
 import os,shutil
 
 def run(arg):
-    cmd = 'go run hashibuild.go ' + arg
+    cmd = '.\hashibuild.exe ' + arg
     print ">", cmd
     out = os.popen(cmd).read()
     print out
     return out
+
+os.system('go build')
 
 cfg = "--config test/testprj.json "
 run(cfg)
@@ -42,4 +44,7 @@ zipcont = os.popen("7za l %s/%s" % (archivedir, arccont[0])).read()
 assert "testfile.txt" in zipcont
 nuke(archivedir)
 
+# test remote fetching
 
+os.environ["HASHIBUILD_ARCHIVE_REMOTE"] = "http://example.com/[ZIP]"
+run(buildcmd)
