@@ -141,25 +141,31 @@ func getCheckSumForFiles(config *AppConfig) (DirEntries, string) {
 	return all, hex.EncodeToString(manifestSum[:])
 }
 
-func run(bin string, arg ...string) {
-	fmt.Printf("> %s %s", bin, arg)	
-		
+func run(cwd string, bin string, arg ...string) {
+	fmt.Printf("> %s %s", bin, arg)			
 	cmd := exec.Command(bin, arg...)
+	cmd.Dir = cwd
 	out, err := cmd.CombinedOutput()	
 	fmt.Printf("%s", string(out))
 	if err != nil {
 		panic(err)
 	}
 }
+
+
 func zipOutput(path string, zipfile string) {
-	run("zip", "-r", zipfile, path+"/*")
+	run(path, "zip", "-r", zipfile, "*")
 }
 
 func unzipOutput(pth string, zipfile string) {
 	// we will replace the old path completely	
-	ensureDir(path.Dir(pth))
-	os.RemoveAll(pth)
-	run("unzip", zipfile, "-d"+pth)
+	ensureDir(pth)
+	err := os.RemoveAll(pth)
+	if err != nil {
+		panic(err)
+	}
+	ensureDir(pth)
+	run(".", "unzip", zipfile, "-d"+pth)
 }
 
 func runBuildCommand(config *AppConfig) {
@@ -267,8 +273,11 @@ func checkDir(pth string) {
 func ensureDir(pth string) {
 	if _, err := os.Stat(pth); os.IsNotExist(err) {
 		fmt.Printf("Creating dir: %s\n", pth)
-		os.MkdirAll(pth, 0777)
-	}	
+		os.MkdirAll(pth, 0777)		
+	} else {
+		fmt.Printf("Path exists: %s\n", pth)
+	}
+
 }
 
 func parseConfig(configPath string) AppConfig {
