@@ -18,6 +18,7 @@ import (
 	"strings"
 )
 
+
 type DirEntry struct {
 	pth      string
 	fi       os.FileInfo
@@ -41,6 +42,7 @@ type AppConfig struct {
 	ArchiveRemote string
 	Include		[]string
 	Exclude		[]string
+	Salt		string
 }
 
 func countFullChecksum(ents *DirEntries) {
@@ -137,6 +139,10 @@ func getCheckSumForFiles(config *AppConfig) (DirEntries, string) {
 		manifest.WriteString(v.checksum)
 		//fmt.Printf("%s %s\n", v.pth, v.checksum)
 	}
+	if config.Salt != "" {
+		manifest.WriteString(config.Salt)
+	}
+	
 	manifestSum := md5.Sum(manifest.Bytes())
 	return all, hex.EncodeToString(manifestSum[:])
 }
@@ -293,10 +299,8 @@ func parseConfig(configPath string) AppConfig {
 	// fixup paths to be relative to config file
 	configDir, _ := filepath.Abs(filepath.Dir(configPath))
 	config.InputRoot = filepath.Join(configDir, config.InputRoot)
-	config.OutputDir = filepath.Join(configDir, config.OutputDir)
-	
+	config.OutputDir = filepath.Join(configDir, config.OutputDir)	
 	checkDir(config.InputRoot)
-
 	return config
 }
 
@@ -316,6 +320,7 @@ func main() {
 	startBuild := flag.Bool("build", false, "Run build")
 	archiveDir := flag.String("archive", "", "Archive root dir (needed if HASHIBUILD_ARCHIVE env var is not set)")
 	fetch := flag.String("fetch", "", "Fetch remote archive file to local archive")
+	salt := flag.String("salt", "", "Provide salt string to invalidate hashes that would otherwise be same")
 	if len(os.Args) < 2 {
 		flag.Usage()
 		return
@@ -335,6 +340,7 @@ func main() {
 		if config.ArchiveRemote == "" {
 			config.ArchiveRemote = os.Getenv("HASHIBUILD_ARCHIVE_REMOTE")
 		}
+		config.Salt = *salt
 	}
 
 	if *fetch != "" {
@@ -355,7 +361,7 @@ func main() {
 	if len(*treeHash) > 0 {
 		pth, _ := filepath.Abs(*treeHash)
 		
-		config := AppConfig{InputRoot: pth }
+		config := AppConfig{InputRoot: pth, Salt: *salt }
 		dumpManifest(&config)
 	}
 
