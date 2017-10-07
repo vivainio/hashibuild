@@ -354,7 +354,6 @@ func main() {
 	toParse := flag.String("config", "", "Json config file")
 	startBuild := flag.Bool("build", false, "Run build")
 	archiveDir := flag.String("archive", "", "Archive root dir (needed if HASHIBUILD_ARCHIVE env var is not set)")
-	fetch := flag.String("fetch", "", "Fetch remote archive file to local archive")
 	salt := flag.String("salt", "", "Provide salt string to invalidate hashes that would otherwise be same")
 	vacuum := flag.Bool("vacuum", false, "Clean up archive directory from old/big files")
 	if len(os.Args) < 2 {
@@ -380,13 +379,6 @@ func main() {
 	}
 	config.Salt = *salt
 
-	if *fetch != "" {
-		_, inputChecksum := getCheckSumForFiles(&config)
-		// if finding archive found, unzip it and we are ready
-		zipName, _ := discoverArchive(&config, inputChecksum)
-		fmt.Printf("%s", zipName)
-	}
-
 	if *manifest {
 		dumpManifest(&config)
 	}
@@ -399,8 +391,7 @@ func main() {
 		vacuumDirectory(config.ArchiveLocal)
 	}
 	if len(*treeHash) > 0 {
-		pth, _ := filepath.Abs(*treeHash)
-		
+		pth, _ := filepath.Abs(*treeHash)		
 		config := AppConfig{InputRoot: pth, Salt: *salt }
 		dumpManifest(&config)
 	}

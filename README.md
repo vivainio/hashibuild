@@ -17,11 +17,13 @@ So we:
 $ zippim get https://github.com/vivainio/hashibuild/releases/download/v0.1/hashibuild.exe
 ```
 
-Or just drop the file to PATH.
+Or just drop the exe file to PATH.
 
 ## Usage
 
 ```
+
+
 λ hashibuild -h
 Usage of C:\PKG\bin\hashibuild.exe:
   -archive string
@@ -32,8 +34,12 @@ Usage of C:\PKG\bin\hashibuild.exe:
         Json config file
   -manifest
         Show manifest (requires --config)
+  -salt string
+        Provide salt string to invalidate hashes that would otherwise be same
   -treehash string
         Show manifest for specified path (no config needed)
+  -vacuum
+        Clean up archive directory from old/big files
 ```
 
 Example configuration file:
@@ -42,10 +48,35 @@ Example configuration file:
 {
     "name": "myapp",
     "inputRoot": "../../myapp",
-    "inputPaths": ["src", "yarn.lock"],
+    "include": ["src", "yarn.lock"],
     "outputDir": "../../myapp/published",
-    "buildCmd": ".\\Build.cmd",
-    "ignores": ["src/Tests", "src/templates.ts"]
+    "buildCmd": ".\\Build.cmd buildapp",
+    "exclude": ["src/Tests", "src/templates.ts"]
 }
 ```
+
+## Archives
+
+There are 2 environment variables that specify the archive directory.
+
+`HASHIBUILD_ARCHIVE` is the local archive directory. This is where all the created zip files are
+saved.
+
+`HASHIBUILD_ARCHIVE_REMOTE` is the remote archive url pattern. If the wanted file doesn't exist 
+in local archive directory, we perform HTTP get to copy thi file to local archive and then 
+use that.
+
+The pattern looks like `https://github.com/vivainio/hashibuild/raw/master/test/fakeremote/[ZIP]`, where `[ZIP]`
+will be replaced by the archive name.
+
+## Ignored files
+
+This only works in git directories; we use "git ls-files" in the inputRoot directory to leverage .gitignore rules.
+
+You can use 'include' and 'exclude' rules to finetune the non-gitignored file set. Simple case-insensitive prefix
+match is used. Include rules are the first filter, after which exclude rules are applied.
+
+
+
+
 
