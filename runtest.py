@@ -46,5 +46,5 @@ nuke(archivedir)
 
 # test remote fetching
 
-os.environ["HASHIBUILD_ARCHIVE_REMOTE"] = "http://example.com/[ZIP]"
+os.environ["HASHIBUILD_ARCHIVE_REMOTE"] = "https://github.com/vivainio/hashibuild/raw/master/test/fakeremote/[ZIP]"
 run(buildcmd)

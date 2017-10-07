@@ -263,7 +263,7 @@ func checkDir(pth string) {
 
 func ensureDir(pth string) {
 	if _, err := os.Stat(pth); os.IsNotExist(err) {
-		fmt.Printf("Creating dir %s", pth)
+		fmt.Printf("Creating dir: %s\n", pth)
 		os.MkdirAll(pth, 0777)
 	}	
 }
