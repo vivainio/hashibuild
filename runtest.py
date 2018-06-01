@@ -14,7 +14,7 @@ run(cfg)
 manifest = run(cfg + "--manifest")
 
 for part in ["buildsomething.cmd", "subdir/testfile.txt"]:
-    assert part in manifest 
+    assert part in manifest
 
 assert "ignored.txt" not in manifest
 
@@ -31,7 +31,8 @@ assert os.path.exists("test/out/testfile.txt")
 
 archivedir = os.path.abspath("test/tmp")
 os.environ["HASHIBUILD_ARCHIVE"] = archivedir
-
+# this should usully move the file to batch upload place, not do slow upload on build
+os.environ["HASHIBUILD_UPLOADER"] = "echo [ZIP]"
 nuke(archivedir)
 nuke(outdir)
 withzipping = run(buildcmd)

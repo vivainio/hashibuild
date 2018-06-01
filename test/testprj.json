@@ -1,6 +1,6 @@
 {
     "name": "hashibuildtest",
-    "inputRoot": "./src/",    
+    "inputRoot": "./src/",
     "outputDir": "./out",
     "buildCmd": ".\\buildsomething.cmd",
     "include": ["subdir/", "buildsomething"],

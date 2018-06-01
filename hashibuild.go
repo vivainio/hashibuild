@@ -1,24 +1,23 @@
 package main
 
 import (
-	"time"
-	"io"
-	"net/http"
-	"path"
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
-
 
 type DirEntry struct {
 	pth      string
@@ -35,15 +34,16 @@ func (a DirEntries) Swap(i, j int) {
 }
 
 type AppConfig struct {
-	Name        string
-	InputRoot   string
-	OutputDir   string
-	BuildCmd    string
-	ArchiveLocal string
+	Name          string
+	InputRoot     string
+	OutputDir     string
+	BuildCmd      string
+	ArchiveLocal  string
 	ArchiveRemote string
-	Include		[]string
-	Exclude		[]string
-	Salt		string
+	Include       []string
+	Exclude       []string
+	Salt          string
+	Uploader      string
 }
 
 func countFullChecksum(ents *DirEntries) {
@@ -78,7 +78,7 @@ func countFullChecksum(ents *DirEntries) {
 func shouldIgnore(config *AppConfig, pth string) bool {
 	pth = strings.ToLower(pth)
 
-	for _,v := range config.Exclude {
+	for _, v := range config.Exclude {
 		if strings.HasPrefix(pth, strings.ToLower(v)) {
 			return true
 		}
@@ -96,24 +96,23 @@ func shouldIgnore(config *AppConfig, pth string) bool {
 	return true
 }
 
-
-func collectWithGit(config *AppConfig) DirEntries{
+func collectWithGit(config *AppConfig) DirEntries {
 	cmd := exec.Command("git", "ls-files")
-	
+
 	cmd.Dir = config.InputRoot
 	out, err := cmd.Output()
-	if (err != nil) {
+	if err != nil {
 		panic(err)
 	}
 	asStr := string(out)
 	lines := strings.Split(asStr, "\n")
 	var all DirEntries
-	
+
 	for _, v := range lines {
 		if shouldIgnore(config, v) {
 			continue
 		}
-		all = append(all, DirEntry { pth: path.Join(config.InputRoot ,v)})
+		all = append(all, DirEntry{pth: path.Join(config.InputRoot, v)})
 	}
 	return all
 }
@@ -131,7 +130,7 @@ func collectByConfig(config *AppConfig) DirEntries {
 	return collectWithGit(config)
 }
 
-func getCheckSumForFiles(config *AppConfig) (DirEntries, string) {		
+func getCheckSumForFiles(config *AppConfig) (DirEntries, string) {
 	all := collectByConfig(config)
 	sort.Sort(all)
 	countFullChecksum(&all)
@@ -151,23 +150,22 @@ func getCheckSumForFiles(config *AppConfig) (DirEntries, string) {
 }
 
 func run(cwd string, bin string, arg ...string) {
-	fmt.Printf("> %s %s", bin, arg)			
+	fmt.Printf("> %s %s", bin, arg)
 	cmd := exec.Command(bin, arg...)
 	cmd.Dir = cwd
-	out, err := cmd.CombinedOutput()	
+	out, err := cmd.CombinedOutput()
 	fmt.Printf("%s\n", string(out))
 	if err != nil {
 		panic(err)
 	}
 }
 
-
 func zipOutput(path string, zipfile string) {
 	run(path, "zip", "-q", "-r", zipfile, "*")
 }
 
 func unzipOutput(pth string, zipfile string) {
-	// we will replace the old path completely	
+	// we will replace the old path completely
 	ensureDir(pth)
 	err := os.RemoveAll(pth)
 	if err != nil {
@@ -177,25 +175,39 @@ func unzipOutput(pth string, zipfile string) {
 	run(".", "unzip", "-qq", zipfile, "-d"+pth)
 }
 
-func runBuildCommand(config *AppConfig) {
-	fmt.Printf("Running build command '%s' in %s\n", config.BuildCmd, config.InputRoot)
-	parts := strings.Fields(config.BuildCmd)
+func createSpacedCommand(fullCommand string) *exec.Cmd {
+	parts := strings.Fields(fullCommand)
 	cmd := exec.Command(parts[0], parts[1:]...)
+	return cmd
+}
+
+func runCommand(config *AppConfig, fullCommand string, ignoreError bool) {
+	fmt.Printf("> %s\n", fullCommand)
+
+	cmd := createSpacedCommand(fullCommand)
 	cmd.Dir = config.InputRoot
 	out, err := cmd.CombinedOutput()
 	fmt.Println(string(out))
 	if err != nil {
-		fmt.Printf("Build failed with error!")
-		panic(err)
+		fmt.Printf("Command '%s' failed with error %s", fullCommand, err)
+		if !ignoreError {
+			panic(err)
+		}
 	}
+
+}
+
+func runBuildCommand(config *AppConfig) {
+	fmt.Printf("Running build command '%s' in %s\n", config.BuildCmd, config.InputRoot)
+	runCommand(config, config.BuildCmd, false)
 }
 
 func fetchTo(url string, to string) bool {
-	fmt.Printf("GET %s\n", url)	
+	fmt.Printf("GET %s\n", url)
 	resp, err := http.Get(url)
 	if err != nil || resp.StatusCode != 200 {
 		fmt.Printf("Not available: %s\n", url)
-		return false		
+		return false
 	}
 	defer resp.Body.Close()
 	out, err := os.Create(to)
@@ -203,15 +215,15 @@ func fetchTo(url string, to string) bool {
 		panic(err)
 	}
 	defer out.Close()
-	_, err  = io.Copy(out, resp.Body)
+	_, err = io.Copy(out, resp.Body)
 	if err != nil {
 		panic(err)
 	}
 	return true
 }
 
-func discoverArchive(config *AppConfig, checksum string) (string,bool) {
-	archiveRoot := config.ArchiveLocal	
+func discoverArchive(config *AppConfig, checksum string) (string, bool) {
+	archiveRoot := config.ArchiveLocal
 	zipName := config.Name + "_" + checksum + ".zip"
 
 	// 1. just try local
@@ -238,7 +250,7 @@ func discoverArchive(config *AppConfig, checksum string) (string,bool) {
 		return localZipName, false
 	}
 	return localZipName, true
-}	
+}
 
 func buildWithConfig(config *AppConfig) {
 	// check input checksum
@@ -254,7 +266,7 @@ func buildWithConfig(config *AppConfig) {
 	_, inputChecksum := getCheckSumForFiles(config)
 	// if finding archive found, unzip it and we are ready
 	ensureDir(archiveRoot)
-	
+
 	zipName, found := discoverArchive(config, inputChecksum)
 
 	if found {
@@ -262,7 +274,7 @@ func buildWithConfig(config *AppConfig) {
 		unzipOutput(config.OutputDir, zipName)
 		return
 	}
-	
+
 	// run build if mismatch
 
 	runBuildCommand(config)
@@ -270,6 +282,12 @@ func buildWithConfig(config *AppConfig) {
 	// zip the results
 	fmt.Printf("Zipping %s to %s\n", config.OutputDir, zipName)
 	zipOutput(config.OutputDir, zipName)
+	if config.Uploader != "" {
+		uploadCmd := strings.Replace(config.Uploader, "[ZIP]", zipName, -1)
+		fmt.Printf("Running uploader command: '%s'\n", uploadCmd)
+		runCommand(config, uploadCmd, true)
+
+	}
 }
 
 func checkDir(pth string) {
@@ -282,11 +300,10 @@ func checkDir(pth string) {
 func ensureDir(pth string) {
 	if _, err := os.Stat(pth); os.IsNotExist(err) {
 		fmt.Printf("Creating dir: %s\n", pth)
-		os.MkdirAll(pth, 0777)		
+		os.MkdirAll(pth, 0777)
 	} else {
 		fmt.Printf("Path exists: %s\n", pth)
 	}
-
 }
 
 func parseConfig(configPath string) AppConfig {
@@ -296,26 +313,24 @@ func parseConfig(configPath string) AppConfig {
 	}
 	config := AppConfig{}
 	err = json.Unmarshal(cont, &config)
-	if (err != nil) {
+	if err != nil {
 		panic(err)
 	}
 	// fixup paths to be relative to config file
 	configDir, _ := filepath.Abs(filepath.Dir(configPath))
 	config.InputRoot = filepath.Join(configDir, config.InputRoot)
-	config.OutputDir = filepath.Join(configDir, config.OutputDir)	
+	config.OutputDir = filepath.Join(configDir, config.OutputDir)
 	checkDir(config.InputRoot)
 	return config
 }
 
 func dumpManifest(config *AppConfig) {
-
 	all, csum := getCheckSumForFiles(config)
 	for _, v := range all {
 		fmt.Printf("%s %s\n", v.pth, v.checksum)
 	}
 	fmt.Printf("Total: %s\n", csum)
 }
-
 
 // 500mb
 const archiveMaxSize = 500 * 1024 * 1024
@@ -332,21 +347,20 @@ func vacuumDirectory(pth string) {
 		panic(err)
 	}
 	// sort by size so bigger ones get deleted earlier
-	sort.Slice(files, func(i int,j int) bool {
+	sort.Slice(files, func(i int, j int) bool {
 		return files[i].Size() > files[j].Size()
-	});
-	tooOld := time.Now().AddDate(0,0,-3)
+	})
+	tooOld := time.Now().AddDate(0, 0, -3)
 	var cumSize int64 = 0
 
 	for _, fi := range files {
 		cumSize = cumSize + fi.Size()
-		
+
 		if tooOld.After(fi.ModTime()) || cumSize > archiveMaxSize {
 			os.Remove(filepath.Join(pth, fi.Name()))
 		}
 	}
 }
-
 
 func main() {
 	manifest := flag.Bool("manifest", false, "Show manifest (requires --config)")
@@ -366,7 +380,7 @@ func main() {
 	config := AppConfig{}
 	if (*toParse) != "" {
 		config = parseConfig(*toParse)
-	} 
+	}
 
 	if *archiveDir != "" {
 		config.ArchiveLocal = *archiveDir
@@ -377,6 +391,10 @@ func main() {
 	if config.ArchiveRemote == "" {
 		config.ArchiveRemote = os.Getenv("HASHIBUILD_ARCHIVE_REMOTE")
 	}
+	if config.Uploader == "" {
+		config.Uploader = os.Getenv("HASHIBUILD_UPLOADER")
+	}
+
 	config.Salt = *salt
 
 	if *manifest {
@@ -391,8 +409,8 @@ func main() {
 		vacuumDirectory(config.ArchiveLocal)
 	}
 	if len(*treeHash) > 0 {
-		pth, _ := filepath.Abs(*treeHash)		
-		config := AppConfig{InputRoot: pth, Salt: *salt }
+		pth, _ := filepath.Abs(*treeHash)
+		config := AppConfig{InputRoot: pth, Salt: *salt}
 		dumpManifest(&config)
 	}
 
