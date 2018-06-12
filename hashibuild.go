@@ -161,7 +161,8 @@ func run(cwd string, bin string, arg ...string) {
 }
 
 func zipOutput(path string, zipfile string) {
-	run(path, "zip", "-q", "-r", zipfile, "*")
+	zipBin := findExe("zip.exe")
+	run(path, zipBin, "-q", "-r", zipfile, "*")
 }
 
 func unzipOutput(pth string, zipfile string) {
@@ -172,7 +173,8 @@ func unzipOutput(pth string, zipfile string) {
 		panic(err)
 	}
 	ensureDir(pth)
-	run(".", "unzip", "-qq", zipfile, "-d"+pth)
+	unzipBin := findExe("unzip.exe")
+	run(".", unzipBin, "-qq", zipfile, "-d"+pth)
 }
 
 func createSpacedCommand(fullCommand string) *exec.Cmd {
@@ -295,6 +297,17 @@ func checkDir(pth string) {
 		fmt.Printf("Path does not exist: %s", pth)
 		panic(err)
 	}
+}
+
+func findExe(exe string) string {
+	dir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
+	adjacent := filepath.Join(dir, exe)
+	if _, err := os.Stat(adjacent); err == nil {
+		return adjacent
+	}
+	// if adjacent file doesn't exist, return the basename and assume it's on PATH
+	return exe
+
 }
 
 func ensureDir(pth string) {
