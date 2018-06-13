@@ -156,6 +156,7 @@ func run(cwd string, bin string, arg ...string) {
 	out, err := cmd.CombinedOutput()
 	fmt.Printf("%s\n", string(out))
 	if err != nil {
+		fmt.Printf("Command failed, will panic: %s '%s'\n", bin, string(out))
 		panic(err)
 	}
 }
