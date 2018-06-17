@@ -25,7 +25,7 @@ def nuke(pth):
 outdir = "test/out"
 nuke(outdir)
 
-buildcmd = cfg + "--build"
+buildcmd = cfg + '--build'
 run(buildcmd)
 assert os.path.exists("test/out/testfile.txt")
 

@@ -19,6 +19,7 @@ import (
 	"time"
 )
 
+// single path entry + checksum
 type DirEntry struct {
 	pth      string
 	fi       os.FileInfo
@@ -33,6 +34,7 @@ func (a DirEntries) Swap(i, j int) {
 	a[i], a[j] = a[j], a[i]
 }
 
+// configuration to pass around
 type AppConfig struct {
 	Name          string
 	InputRoot     string
@@ -44,6 +46,7 @@ type AppConfig struct {
 	Exclude       []string
 	Salt          string
 	Uploader      string
+	BuildParam    string
 }
 
 func countFullChecksum(ents *DirEntries) {
@@ -145,6 +148,10 @@ func getCheckSumForFiles(config *AppConfig) (DirEntries, string) {
 		manifest.WriteString(config.Salt)
 	}
 
+	if config.BuildParam != "" {
+		manifest.WriteString(config.BuildParam)
+	}
+
 	manifestSum := md5.Sum(manifest.Bytes())
 	return all, hex.EncodeToString(manifestSum[:])
 }
@@ -202,6 +209,9 @@ func runCommand(config *AppConfig, fullCommand string, ignoreError bool) {
 
 func runBuildCommand(config *AppConfig) {
 	fmt.Printf("Running build command '%s' in %s\n", config.BuildCmd, config.InputRoot)
+	if strings.Contains(config.BuildCmd, "[BUILDPARAM]") {
+		fmt.Printf("Warning: build command %s contains [BUILDPARAM], forgot the --buildparam argument to hashibuild invocation?\n", config.BuildCmd)
+	}
 	runCommand(config, config.BuildCmd, false)
 }
 
@@ -365,7 +375,7 @@ func vacuumDirectory(pth string) {
 		return files[i].Size() > files[j].Size()
 	})
 	tooOld := time.Now().AddDate(0, 0, -3)
-	var cumSize int64 = 0
+	var cumSize int64
 
 	for _, fi := range files {
 		cumSize = cumSize + fi.Size()
@@ -384,6 +394,7 @@ func main() {
 	archiveDir := flag.String("archive", "", "Archive root dir (needed if HASHIBUILD_ARCHIVE env var is not set)")
 	salt := flag.String("salt", "", "Provide salt string to invalidate hashes that would otherwise be same")
 	vacuum := flag.Bool("vacuum", false, "Clean up archive directory from old/big files")
+	buildParam := flag.String("buildparam", "", "Provide extra flags to build command, stored in [BUILDPARAM] and added to hash")
 	if len(os.Args) < 2 {
 		flag.Usage()
 		return
@@ -407,6 +418,11 @@ func main() {
 	}
 	if config.Uploader == "" {
 		config.Uploader = os.Getenv("HASHIBUILD_UPLOADER")
+	}
+
+	if *buildParam != "" {
+		config.BuildParam = *buildParam
+		config.BuildCmd = strings.Replace(config.BuildCmd, "[BUILDPARAM]", *buildParam, -1)
 	}
 
 	config.Salt = *salt
