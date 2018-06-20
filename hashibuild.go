@@ -158,7 +158,7 @@ func getCheckSumForFiles(config *AppConfig) (DirEntries, string) {
 }
 
 func run(cwd string, bin string, arg ...string) {
-	fmt.Printf("> %s %s", bin, arg)
+	fmt.Printf("> %s %s [%s]", bin, arg, cwd)
 	cmd := exec.Command(bin, arg...)
 	cmd.Dir = cwd
 	out, err := cmd.CombinedOutput()
@@ -170,9 +170,12 @@ func run(cwd string, bin string, arg ...string) {
 }
 
 func zipOutput(rootPath string, paths []string, zipfile string) {
+	_ = os.Remove(zipfile)
 	zipBin := findExe("7za.exe")
 	args := []string{"a", "-y", "-r", zipfile}
-	args = append(args, paths...)
+	for _, el := range paths {
+		args = append(args, el+"/")
+	}
 	run(rootPath, zipBin, args...)
 
 }
@@ -180,7 +183,7 @@ func zipOutput(rootPath string, paths []string, zipfile string) {
 func unzipOutput(pth string, zipfile string) {
 	ensureDir(pth)
 	unzipBin := findExe("7za.exe")
-	run(".", unzipBin, "-y", "x", zipfile, "-o"+pth)
+	run(pth, unzipBin, "-y", "x", zipfile)
 }
 
 func createSpacedCommand(fullCommand string) *exec.Cmd {
@@ -281,7 +284,7 @@ func buildWithConfig(config *AppConfig) {
 	zipName, found := discoverArchive(config, inputChecksum)
 
 	if found {
-		fmt.Printf("Unzip %s in %s\n", zipName, config.InputRoot)
+		fmt.Printf("Unzip %s in %s\n", zipName, config.OutputRoot)
 		unzipOutput(config.OutputRoot, zipName)
 		return
 	}
