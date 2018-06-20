@@ -2,7 +2,7 @@
     "name": "hashibuildtest",
     "inputRoot": "./src/",
     "outputRoot": "./",
-    "outputDir": "out",
+    "outputDirs": ["out"],
     "buildCmd": ".\\buildsomething.cmd [BUILDPARAM]",
     "include": ["subdir/", "buildsomething"],
     "exclude": ["subdir/ignored.txt"]

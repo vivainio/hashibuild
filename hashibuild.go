@@ -36,11 +36,10 @@ func (a DirEntries) Swap(i, j int) {
 
 // AppConfig is configuration to pass around
 type AppConfig struct {
-	Name      string
-	InputRoot string
-	OutputDir string
-	// usually same as inputroot. Doesn't need to be provided if it is
-	OutputRoot    string
+	Name          string
+	InputRoot     string
+	OutputDirs    []string
+	OutputRoot    string // usually same as inputroot. Doesn't need to be provided if it is
 	BuildCmd      string
 	ArchiveLocal  string
 	ArchiveRemote string
@@ -170,9 +169,11 @@ func run(cwd string, bin string, arg ...string) {
 	}
 }
 
-func zipOutput(rootPath string, path string, zipfile string) {
+func zipOutput(rootPath string, paths []string, zipfile string) {
 	zipBin := findExe("7za.exe")
-	run(rootPath, zipBin, "a", "-y", "-r", zipfile, path)
+	args := []string{"a", "-y", "-r", zipfile}
+	args = append(args, paths...)
+	run(rootPath, zipBin, args...)
 
 }
 
@@ -291,7 +292,7 @@ func buildWithConfig(config *AppConfig) {
 
 	// zip the results
 	fmt.Printf("Zipping %s to %s\n", config.OutputRoot, zipName)
-	zipOutput(config.OutputRoot, config.OutputDir, zipName)
+	zipOutput(config.OutputRoot, config.OutputDirs, zipName)
 	if config.Uploader != "" {
 		uploadCmd := strings.Replace(config.Uploader, "[ZIP]", zipName, -1)
 		fmt.Printf("Running uploader command: '%s'\n", uploadCmd)
@@ -345,7 +346,6 @@ func parseConfig(configPath string) AppConfig {
 	} else {
 		config.OutputRoot = filepath.Join(configDir, config.OutputRoot)
 	}
-	//config.OutputDir = config.OutputDir
 	checkDir(config.InputRoot)
 	return config
 }
