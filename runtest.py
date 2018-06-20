@@ -7,9 +7,10 @@ def run(arg):
     p = os.popen(cmd)
     out = p.read()
     status = p.close()
+    print out
     if status:
         raise RuntimeError("Command failed with %d" % status)
-    print out
+
     return out
 
 subprocess.check_call(["go", "build"])

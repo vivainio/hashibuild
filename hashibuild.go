@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-// single path entry + checksum
+// DirEntry is single path entry + checksum
 type DirEntry struct {
 	pth      string
 	fi       os.FileInfo
@@ -34,11 +34,13 @@ func (a DirEntries) Swap(i, j int) {
 	a[i], a[j] = a[j], a[i]
 }
 
-// configuration to pass around
+// AppConfig is configuration to pass around
 type AppConfig struct {
-	Name          string
-	InputRoot     string
-	OutputDir     string
+	Name      string
+	InputRoot string
+	OutputDir string
+	// usually same as inputroot. Doesn't need to be provided if it is
+	OutputRoot    string
 	BuildCmd      string
 	ArchiveLocal  string
 	ArchiveRemote string
@@ -168,21 +170,16 @@ func run(cwd string, bin string, arg ...string) {
 	}
 }
 
-func zipOutput(path string, zipfile string) {
+func zipOutput(rootPath string, path string, zipfile string) {
 	zipBin := findExe("7za.exe")
-	run(path, zipBin, "a", zipfile, path+"/*")
+	run(rootPath, zipBin, "a", "-y", "-r", zipfile, path)
+
 }
 
 func unzipOutput(pth string, zipfile string) {
-	// we will replace the old path completely
-	ensureDir(pth)
-	err := os.RemoveAll(pth)
-	if err != nil {
-		panic(err)
-	}
 	ensureDir(pth)
 	unzipBin := findExe("7za.exe")
-	run(".", unzipBin, "x", zipfile, "-o"+pth)
+	run(".", unzipBin, "-y", "x", zipfile, "-o"+pth)
 }
 
 func createSpacedCommand(fullCommand string) *exec.Cmd {
@@ -283,8 +280,8 @@ func buildWithConfig(config *AppConfig) {
 	zipName, found := discoverArchive(config, inputChecksum)
 
 	if found {
-		fmt.Printf("Unzip %s to %s\n", zipName, config.OutputDir)
-		unzipOutput(config.OutputDir, zipName)
+		fmt.Printf("Unzip %s in %s\n", zipName, config.InputRoot)
+		unzipOutput(config.OutputRoot, zipName)
 		return
 	}
 
@@ -293,8 +290,8 @@ func buildWithConfig(config *AppConfig) {
 	runBuildCommand(config)
 
 	// zip the results
-	fmt.Printf("Zipping %s to %s\n", config.OutputDir, zipName)
-	zipOutput(config.OutputDir, zipName)
+	fmt.Printf("Zipping %s to %s\n", config.OutputRoot, zipName)
+	zipOutput(config.OutputRoot, config.OutputDir, zipName)
 	if config.Uploader != "" {
 		uploadCmd := strings.Replace(config.Uploader, "[ZIP]", zipName, -1)
 		fmt.Printf("Running uploader command: '%s'\n", uploadCmd)
@@ -343,7 +340,12 @@ func parseConfig(configPath string) AppConfig {
 	// fixup paths to be relative to config file
 	configDir, _ := filepath.Abs(filepath.Dir(configPath))
 	config.InputRoot = filepath.Join(configDir, config.InputRoot)
-	config.OutputDir = filepath.Join(configDir, config.OutputDir)
+	if config.OutputRoot == "" {
+		config.OutputRoot = config.InputRoot
+	} else {
+		config.OutputRoot = filepath.Join(configDir, config.OutputRoot)
+	}
+	//config.OutputDir = config.OutputDir
 	checkDir(config.InputRoot)
 	return config
 }
