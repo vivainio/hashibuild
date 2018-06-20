@@ -169,8 +169,8 @@ func run(cwd string, bin string, arg ...string) {
 }
 
 func zipOutput(path string, zipfile string) {
-	zipBin := findExe("zip.exe")
-	run(path, zipBin, "-q", "-r", zipfile, "*")
+	zipBin := findExe("7za.exe")
+	run(path, zipBin, "a", zipfile, path+"/*")
 }
 
 func unzipOutput(pth string, zipfile string) {
@@ -181,8 +181,8 @@ func unzipOutput(pth string, zipfile string) {
 		panic(err)
 	}
 	ensureDir(pth)
-	unzipBin := findExe("unzip.exe")
-	run(".", unzipBin, "-qq", zipfile, "-d"+pth)
+	unzipBin := findExe("7za.exe")
+	run(".", unzipBin, "x", zipfile, "-o"+pth)
 }
 
 func createSpacedCommand(fullCommand string) *exec.Cmd {
