@@ -16,7 +16,7 @@ def run(arg):
 subprocess.check_call(["go", "build"])
 os.system('go build')
 
-cfg = "--config test/testprj.json "
+cfg = "--salt 2 --config test/testprj.json "
 run(cfg)
 manifest = run(cfg + "--manifest")
 
