@@ -4,6 +4,6 @@
     "outputRoot": "./",
     "outputDirs": ["out"],
     "buildCmd": ".\\buildsomething.cmd [BUILDPARAM]",
-    "include": ["subdir/", "buildsomething"],
+    "include": ["subdir/", "buildsomething.cmd"],
     "exclude": ["subdir/ignored.txt"]
 }
