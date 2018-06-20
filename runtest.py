@@ -1,12 +1,18 @@
 import os,shutil
+import subprocess
 
 def run(arg):
     cmd = '.\hashibuild.exe ' + arg
     print ">", cmd
-    out = os.popen(cmd).read()
+    p = os.popen(cmd)
+    out = p.read()
+    status = p.close()
+    if status:
+        raise RuntimeError("Command failed with %d" % status)
     print out
     return out
 
+subprocess.check_call(["go", "build"])
 os.system('go build')
 
 cfg = "--config test/testprj.json "
