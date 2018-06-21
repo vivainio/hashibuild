@@ -174,7 +174,7 @@ func zipOutput(rootPath string, paths []string, zipfile string) {
 	zipBin := findExe("7za.exe")
 	args := []string{"a", "-y", "-r", zipfile}
 	for _, el := range paths {
-		args = append(args, el+"/")
+		args = append(args, el)
 	}
 	run(rootPath, zipBin, args...)
 
