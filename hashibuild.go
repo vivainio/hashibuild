@@ -197,8 +197,9 @@ func runCommand(config *AppConfig, fullCommand string, ignoreError bool) {
 
 	cmd := createSpacedCommand(fullCommand)
 	cmd.Dir = config.InputRoot
-	out, err := cmd.CombinedOutput()
-	fmt.Println(string(out))
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stdout
+	err := cmd.Run()
 	if err != nil {
 		fmt.Printf("Command '%s' failed with error %s", fullCommand, err)
 		if !ignoreError {
