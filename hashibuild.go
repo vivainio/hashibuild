@@ -201,9 +201,9 @@ func runCommand(config *AppConfig, fullCommand string, ignoreError bool) {
 	cmd.Stderr = os.Stdout
 	err := cmd.Run()
 	if err != nil {
-		fmt.Printf("Command '%s' failed with error %s", fullCommand, err)
+		fmt.Printf("ERROR hashibuild: Command '%s' failed with error %s", fullCommand, err)
 		if !ignoreError {
-			panic(err)
+			os.Exit(2)
 		}
 	}
 
