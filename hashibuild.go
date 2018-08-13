@@ -210,9 +210,9 @@ func runCommand(config *AppConfig, fullCommand string, ignoreError bool) {
 }
 
 func runBuildCommand(config *AppConfig) {
-	fmt.Printf("Running build command '%s' in %s\n", config.BuildCmd, config.InputRoot)
+	fmt.Printf("hashibuild: Running build command '%s' in %s\n", config.BuildCmd, config.InputRoot)
 	if strings.Contains(config.BuildCmd, "[BUILDPARAM]") {
-		fmt.Printf("Warning: build command %s contains [BUILDPARAM], forgot the --buildparam argument to hashibuild invocation?\n", config.BuildCmd)
+		fmt.Printf("hashibuild: Warning: build command %s contains [BUILDPARAM], forgot the --buildparam argument to hashibuild invocation?\n", config.BuildCmd)
 	}
 	runCommand(config, config.BuildCmd, false)
 }
@@ -299,7 +299,7 @@ func buildWithConfig(config *AppConfig) {
 	zipOutput(config.OutputRoot, config.OutputDirs, zipName)
 	if config.Uploader != "" {
 		uploadCmd := strings.Replace(config.Uploader, "[ZIP]", zipName, -1)
-		fmt.Printf("Running uploader command: '%s'\n", uploadCmd)
+		fmt.Printf("hashibuild: Running uploader command: '%s'\n", uploadCmd)
 		runCommand(config, uploadCmd, true)
 
 	}
