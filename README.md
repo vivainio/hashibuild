@@ -1,4 +1,7 @@
 # hashibuild
+
+[![Build Status](https://dev.azure.com/ville0567/ville/_apis/build/status/vivainio.hashibuild?branchName=master)](https://dev.azure.com/ville0567/ville/_build/latest?definitionId=3&branchName=master)
+
 Hash initiated build. Avoid recompiling artifacts when source tree hash hasn't changed.
 
 The basic idea is that your build artifacts in "outputDir" are a direct function of a set of your source files. We perform a deep tree checksum of your source tree and zip up the output directory with the name derived from the checksum.
